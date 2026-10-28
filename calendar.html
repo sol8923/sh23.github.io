@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>일정 공유 달력</title>
+  <style>
+    body { font-family: 'Malgun Gothic', sans-serif; margin: 20px; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    button { padding: 5px 15px; cursor: pointer; }
+    .grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; text-align: center; }
+    .day-name { font-weight: bold; padding: 10px; background: #f0f0f0; }
+    .day-name.sun { color: red; }
+    .day-name.sat { color: blue; }
+    .date-cell { border: 1px solid #ccc; height: 100px; padding: 5px; cursor: pointer; text-align: left; }
+    .date-cell:hover { background: #e9ecef; }
+    .date-cell .date-num { font-weight: bold; }
+    .date-cell.sun .date-num { color: red; }
+    .date-cell.sat .date-num { color: blue; }
+    .date-cell.holiday .date-num { color: red; }
+    
+    /* 팝업(모달) 스타일 */
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
+    .modal-content { background: white; padding: 20px; border-radius: 8px; width: 300px; display: flex; flex-direction: column; gap: 15px; }
+    .modal-content label { font-weight: bold; font-size: 0.9em; }
+    .modal-content input, .modal-content select, .modal-content textarea { width: 100%; padding: 5px; box-sizing: border-box; }
+    .btn-group { display: flex; justify-content: flex-end; gap: 10px; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <button onclick="changeMonth(-1)">◀ 이전달</button>
+    <h2 id="month-title">2026년 10월</h2>
+    <button onclick="changeMonth(1)">다음달 ▶</button>
+  </div>
+
+  <div class="grid" id="calendar-days">
+    <div class="day-name sun">일</div><div class="day-name">월</div><div class="day-name">화</div>
+    <div class="day-name">수</div><div class="day-name">목</div><div class="day-name">금</div><div class="day-name sat">토</div>
+  </div>
+  <div class="grid" id="calendar-grid"></div>
+
+  <!-- 일정 입력 팝업창 -->
+  <div id="schedule-modal" class="modal">
+    <div class="modal-content">
+      <h3>일정 등록</h3>
+      
+      <div>
+        <label>시작 날짜</label>
+        <input type="date" id="start-date">
+      </div>
+      <div>
+        <label>종료 날짜 (기본은 당일)</label>
+        <input type="date" id="end-date">
+      </div>
+      
+      <div>
+        <label>일정 종류</label>
+        <select id="event-type">
+          <option value="업무">업무</option>
+          <option value="부재">부재</option>
+          <option value="기타">기타</option>
+        </select>
+      </div>
+
+      <div>
+        <label>인원</label>
+        <select id="event-person">
+          <option value="인원1">인원1</option>
+          <option value="인원2">인원2</option>
+          <option value="인원3">인원3</option>
+        </select>
+      </div>
+
+      <div>
+        <label>세부 내용</label>
+        <textarea id="event-details" rows="3" placeholder="내용을 입력하세요"></textarea>
+      </div>
+
+      <div class="btn-group">
+        <button onclick="closeModal()">취소</button>
+        <button onclick="saveSchedule()" style="background:#007bff; color:white; border:none;">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentDate = new Date();
+    // 고정된 양력 공휴일 (설날, 추석 등 음력은 매년 달라지므로 별도 처리 필요)
+    const holidays = ["01-01", "03-01", "05-05", "06-06", "08-15", "10-03", "10-09", "12-25"];
+
+    function renderCalendar() {
+      const grid = document.getElementById("calendar-grid");
+      grid.innerHTML = "";
+      
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth();
+      document.getElementById("month-title").innerText = `${year}년 ${month + 1}월`;
+
+      const firstDay = new Date(year, month, 1).getDay();
+      const lastDate = new Date(year, month + 1, 0).getDate();
+
+      // 빈 칸 채우기
+      for(let i=0; i<firstDay; i++) {
+        grid.innerHTML += `<div class="date-cell"></div>`;
+      }
+
+      // 날짜 채우기
+      for(let i=1; i<=lastDate; i++) {
+        const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
+        const monthDayStr = `${String(month+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
+        const dayOfWeek = new Date(year, month, i).getDay();
+        
+        let cellClass = "date-cell";
+        if (dayOfWeek === 0) cellClass += " sun";
+        if (dayOfWeek === 6) cellClass += " sat";
+        if (holidays.includes(monthDayStr)) cellClass += " holiday"; // 공휴일 빨간색
+
+        grid.innerHTML += `
+          <div class="${cellClass}" onclick="openModal('${dateStr}')">
+            <span class="date-num">${i}</span>
+            <div id="events-${dateStr}" style="margin-top:5px; font-size:12px;"></div>
+          </div>
+        `;
+      }
+    }
+
+    function changeMonth(step) {
+      currentDate.setMonth(currentDate.getMonth() + step);
+      renderCalendar();
+    }
+
+    function openModal(date) {
+      document.getElementById('start-date').value = date;
+      document.getElementById('end-date').value = date; // 기본적으로 클릭한 날짜와 동일하게 세팅
+      document.getElementById('schedule-modal').style.display = 'flex';
+    }
+
+    function closeModal() {
+      document.getElementById('schedule-modal').style.display = 'none';
+      document.getElementById('event-details').value = ""; // 내용 초기화
+    }
+
+    function saveSchedule() {
+      alert("UI 팝업 테스트 완료! (실제 저장은 다음 단계에서 깃허브 API를 연동해야 합니다.)");
+      closeModal();
+    }
+
+    // 페이지 로딩 시 초기 달력 그리기
+    renderCalendar();
+  </script>
+</body>
+</html>
