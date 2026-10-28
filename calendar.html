@@ -38,6 +38,8 @@
     .modal-content input, .modal-content select, .modal-content textarea { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; margin-top: 3px; }
     .btn-group { display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px; }
     
+    .btn-edit { background: #17a2b8; color: white; border: none; padding: 4px 8px; font-size: 11px; border-radius: 3px; cursor: pointer; }
+    .btn-edit:hover { background: #138496; }
     .btn-delete { background: #dc3545; color: white; border: none; padding: 4px 8px; font-size: 11px; border-radius: 3px; cursor: pointer; }
     .btn-delete:hover { background: #c82333; }
   </style>
@@ -72,14 +74,21 @@
     </div>
   </div>
 
-  <!-- 일정 입력 팝업창 -->
+  <!-- 일정 등록 및 수정 팝업창 -->
   <div id="schedule-modal" class="modal">
     <div class="modal-content">
-      <h3>일정 등록</h3>
+      <h3 id="schedule-modal-title">일정 등록</h3>
       <div><label>시작 날짜</label><input type="date" id="start-date"></div>
       <div><label>종료 날짜</label><input type="date" id="end-date"></div>
-      <div><label>일정 종류</label><select id="event-type"></select></div>
-      <div><label>인원</label><select id="event-person"></select></div>
+      <div>
+        <label>일정 종류</label>
+        <select id="event-type" onchange="togglePersonField()"></select>
+      </div>
+      <!-- 부재 선택 시에만 나타날 인원 선택란 -->
+      <div id="person-container">
+        <label>인원</label>
+        <select id="event-person"></select>
+      </div>
       <div><label>세부 내용</label><textarea id="event-details" rows="3" placeholder="내용을 입력하세요"></textarea></div>
       <div class="btn-group">
         <button onclick="closeModal()">취소</button>
@@ -92,18 +101,14 @@
   <div id="settings-modal" class="modal">
     <div class="modal-content" style="width: 340px;">
       <h3>⚙️ 환경 설정</h3>
-      
       <div>
         <label>🔑 관리자 토큰 <span style="font-weight:normal; font-size:0.9em; color:#007bff;">(입력 시 내 기기에 자동 저장)</span></label>
         <input type="password" id="github-token" placeholder="github_pat_... 붙여넣기" oninput="localStorage.setItem('calendar_github_token', this.value)">
       </div>
-
       <hr style="border:0; border-top:1px solid #ddd; margin:15px 0;">
-      
       <p style="font-size:0.9em; font-weight:bold; color:#333; margin:0 0 5px 0;">달력 옵션 항목 <span style="font-size:0.85em; color:#666; font-weight:normal;">(쉼표로 구분)</span></p>
       <div><label>일정 종류 목록</label><input type="text" id="config-types"></div>
       <div><label>인원 목록</label><input type="text" id="config-persons"></div>
-      
       <div class="btn-group" style="margin-top: 15px;">
         <button onclick="closeSettingsModal()">닫기</button>
         <button onclick="saveData('settings')" style="background:#28a745; color:white; border:none;">항목 동기화</button>
@@ -118,6 +123,7 @@
     
     let currentDate = new Date();
     let selectedDateStr = "";
+    let editingEventId = null; // 수정 모드 구분을 위한 변수
     
     let appData = {
       settings: { types: ["업무", "부재", "기타"], persons: ["인원1", "인원2", "인원3"] },
@@ -140,19 +146,15 @@
       "2026-08-17": "대체공휴일", "2026-09-24": "추석 연휴", "2026-09-25": "추석", "2026-09-26": "추석 연휴"
     };
 
-    // 로컬 스토리지에 저장된 토큰이 있다면 입력창에 자동 채워넣기
     const savedToken = localStorage.getItem("calendar_github_token");
-    if (savedToken) {
-      document.getElementById("github-token").value = savedToken;
-    }
+    if (savedToken) document.getElementById("github-token").value = savedToken;
 
     async function fetchSchedule() {
       try {
         const res = await fetch(API_URL + "?t=" + new Date().getTime());
         if (res.ok) {
           const data = await res.json();
-          const decoded = decodeURIComponent(escape(atob(data.content)));
-          const parsed = JSON.parse(decoded);
+          const parsed = JSON.parse(decodeURIComponent(escape(atob(data.content))));
           if (Array.isArray(parsed)) appData.events = parsed;
           else appData = parsed;
         }
@@ -166,6 +168,19 @@
       const personSelect = document.getElementById("event-person");
       typeSelect.innerHTML = appData.settings.types.map(t => `<option value="${t}">${t}</option>`).join('');
       personSelect.innerHTML = appData.settings.persons.map(p => `<option value="${p}">${p}</option>`).join('');
+      togglePersonField();
+    }
+
+    // [기능 추가 1] 일정 종류에 따라 인원 입력칸 보이기/숨기기
+    function togglePersonField() {
+      const typeSelect = document.getElementById("event-type");
+      const personContainer = document.getElementById("person-container");
+      // "부재"일 때만 보이게 처리
+      if (typeSelect.value === "부재") {
+        personContainer.style.display = "block";
+      } else {
+        personContainer.style.display = "none";
+      }
     }
 
     function renderCalendar() {
@@ -199,9 +214,13 @@
           if (dateStr >= evt.startDate && dateStr <= evt.endDate) {
             const typeIndex = Math.max(0, appData.settings.types.indexOf(evt.type));
             const color = colors[typeIndex % colors.length];
+            
+            // "부재"일 때만 달력에도 인원 표시
+            const personText = evt.type === "부재" ? ` ${evt.person}` : ""; 
+            
             eventsHtml += `
               <div class="event-item" style="background:${color.bg}; border-left:3px solid ${color.bd};">
-                <strong>[${evt.type}]</strong> ${evt.person} <br>
+                <strong>[${evt.type}]</strong>${personText} <br>
                 <span style="color:#666;">${evt.details}</span>
               </div>
             `;
@@ -235,13 +254,18 @@
         dayEvents.forEach(evt => {
           const typeIndex = Math.max(0, appData.settings.types.indexOf(evt.type));
           const color = colors[typeIndex % colors.length];
+          const personText = evt.type === "부재" ? ` ${evt.person}` : "";
+          
           listDiv.innerHTML += `
             <div style="display:flex; justify-content:space-between; align-items:center; background:${color.bg}; border-left:3px solid ${color.bd}; padding:8px; border-radius:4px;">
               <div style="font-size: 13px;">
-                <strong>[${evt.type}]</strong> ${evt.person} <br>
+                <strong>[${evt.type}]</strong>${personText} <br>
                 <span style="color:#555;">${evt.details}</span>
               </div>
-              <button class="btn-delete" onclick="deleteSchedule(${evt.id}, this)">삭제</button>
+              <div style="display:flex; gap:5px; flex-shrink:0;">
+                <button class="btn-edit" onclick="editSchedule(${evt.id})">수정</button>
+                <button class="btn-delete" onclick="deleteSchedule(${evt.id}, this)">삭제</button>
+              </div>
             </div>
           `;
         });
@@ -259,14 +283,37 @@
     }
 
     function openScheduleModal(date) {
+      editingEventId = null; // 새 일정 추가 모드
+      document.getElementById('schedule-modal-title').innerText = "새 일정 등록";
       document.getElementById('start-date').value = date;
       document.getElementById('end-date').value = date;
+      document.getElementById('event-details').value = "";
+      if(appData.settings.types.length > 0) document.getElementById('event-type').value = appData.settings.types[0];
+      togglePersonField(); // 종류에 따라 인원칸 자동 숨김/표시
+      document.getElementById('schedule-modal').style.display = 'flex';
+    }
+    
+    // [기능 추가 2] 수정 버튼 클릭 시 팝업 열기
+    function editSchedule(eventId) {
+      closeActionModal();
+      const evt = appData.events.find(e => e.id === eventId);
+      if (!evt) return;
+      
+      editingEventId = eventId; // 수정 모드로 설정
+      document.getElementById('schedule-modal-title').innerText = "일정 수정";
+      document.getElementById('start-date').value = evt.startDate;
+      document.getElementById('end-date').value = evt.endDate;
+      document.getElementById('event-type').value = evt.type;
+      togglePersonField(); // 변경된 종류에 맞게 인원칸 표시 갱신
+      if (evt.person) document.getElementById('event-person').value = evt.person;
+      document.getElementById('event-details').value = evt.details;
+      
       document.getElementById('schedule-modal').style.display = 'flex';
     }
     
     function closeModal() {
       document.getElementById('schedule-modal').style.display = 'none';
-      document.getElementById('event-details').value = "";
+      editingEventId = null;
     }
 
     function openSettingsModal() {
@@ -279,7 +326,6 @@
 
     async function deleteSchedule(eventId, btnEl) {
       if (!confirm("이 일정을 정말 삭제하시겠습니까?")) return;
-      
       const token = document.getElementById("github-token").value;
       if (!token) { alert("우측 상단의 ⚙️ 설정 메뉴에서 관리자 토큰을 먼저 입력해 주세요."); return; }
 
@@ -332,12 +378,25 @@
           
           btn = document.querySelector("#schedule-modal .btn-group button:last-child");
           btn.innerText = "저장 중...";
-          latestData.events.push({
-            id: Date.now(), startDate: start, endDate: end,
-            type: document.getElementById("event-type").value,
-            person: document.getElementById("event-person").value,
-            details: document.getElementById("event-details").value
-          });
+          
+          // 수정 모드인지 새 일정 추가 모드인지 분기 처리
+          if (editingEventId) {
+            const idx = latestData.events.findIndex(e => e.id === editingEventId);
+            if (idx !== -1) {
+              latestData.events[idx].startDate = start;
+              latestData.events[idx].endDate = end;
+              latestData.events[idx].type = document.getElementById("event-type").value;
+              latestData.events[idx].person = document.getElementById("event-person").value;
+              latestData.events[idx].details = document.getElementById("event-details").value;
+            }
+          } else {
+            latestData.events.push({
+              id: Date.now(), startDate: start, endDate: end,
+              type: document.getElementById("event-type").value,
+              person: document.getElementById("event-person").value,
+              details: document.getElementById("event-details").value
+            });
+          }
         } else if (mode === 'settings') {
           btn = document.querySelector("#settings-modal .btn-group button:last-child");
           btn.innerText = "저장 중...";
@@ -350,7 +409,7 @@
         const putRes = await fetch(API_URL, {
           method: "PUT",
           headers: { "Authorization": `token ${token}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ message: mode === 'schedule' ? "일정 추가" : "설정 변경", content: btoa(unescape(encodeURIComponent(JSON.stringify(latestData, null, 2)))), sha: getData.sha })
+          body: JSON.stringify({ message: mode === 'schedule' ? (editingEventId ? "일정 수정" : "일정 추가") : "설정 변경", content: btoa(unescape(encodeURIComponent(JSON.stringify(latestData, null, 2)))), sha: getData.sha })
         });
 
         if (putRes.ok) {
