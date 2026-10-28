@@ -6,8 +6,10 @@
   <title>일정 공유 달력</title>
   <style>
     body { font-family: 'Malgun Gothic', sans-serif; margin: 20px; }
-    .top-bar { display: flex; justify-content: flex-end; margin-bottom: 10px; font-size: 0.9em; }
-    .top-bar input { padding: 4px; width: 250px; margin-left: 10px; }
+    .top-bar { display: flex; justify-content: flex-end; align-items: center; margin-bottom: 10px; }
+    .btn-setting { background: #6c757d; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+    .btn-setting:hover { background: #5a6268; }
+    
     .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
     button { padding: 5px 15px; cursor: pointer; border: 1px solid #ccc; border-radius: 4px; background: white; }
     button:hover { background: #f0f0f0; }
@@ -27,23 +29,23 @@
     
     .event-container { margin-top: 5px; flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
     .event-item { padding: 3px 4px; border-radius: 3px; font-size: 11px; color: #333; line-height: 1.2; word-break: break-all; }
-    .type-업무 { background: #d4edda; border-left: 3px solid #28a745; }
-    .type-부재 { background: #f8d7da; border-left: 3px solid #dc3545; }
-    .type-기타 { background: #fff3cd; border-left: 3px solid #ffc107; }
 
     /* 팝업(모달) 스타일 */
     .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; }
     .modal-content { background: white; padding: 25px; border-radius: 10px; width: 320px; display: flex; flex-direction: column; gap: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
-    .modal-content h3 { margin: 0 0 10px 0; }
+    .modal-content h3 { margin: 0 0 5px 0; }
     .modal-content label { font-weight: bold; font-size: 0.9em; color: #555; }
     .modal-content input, .modal-content select, .modal-content textarea { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; margin-top: 3px; }
     .btn-group { display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px; }
+    
+    .btn-delete { background: #dc3545; color: white; border: none; padding: 4px 8px; font-size: 11px; border-radius: 3px; cursor: pointer; }
+    .btn-delete:hover { background: #c82333; }
   </style>
 </head>
 <body>
 
   <div class="top-bar">
-    <label>관리자 토큰(일정 추가시 필요): <input type="password" id="github-token" placeholder="github_pat_..."></label>
+    <button class="btn-setting" onclick="openSettingsModal()">⚙️ 설정 (토큰/항목)</button>
   </div>
 
   <div class="header">
@@ -58,32 +60,53 @@
   </div>
   <div class="grid" id="calendar-grid"></div>
 
+  <!-- 날짜 클릭 시 나타나는 미니 팝업 -->
+  <div id="action-modal" class="modal">
+    <div class="modal-content" style="width: 350px;">
+      <h3 id="action-date-title">일정 확인</h3>
+      <div id="action-event-list" style="display:flex; flex-direction:column; gap:8px; max-height:200px; overflow-y:auto; margin-bottom:5px;"></div>
+      <div class="btn-group" style="justify-content: space-between; border-top: 1px solid #eee; padding-top: 15px;">
+        <button onclick="closeActionModal()">닫기</button>
+        <button onclick="openScheduleModalFromAction()" style="background:#28a745; color:white; border:none; font-weight:bold;">+ 새 일정 추가</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 일정 입력 팝업창 -->
   <div id="schedule-modal" class="modal">
     <div class="modal-content">
       <h3>일정 등록</h3>
       <div><label>시작 날짜</label><input type="date" id="start-date"></div>
       <div><label>종료 날짜</label><input type="date" id="end-date"></div>
-      <div>
-        <label>일정 종류</label>
-        <select id="event-type">
-          <option value="업무">업무</option>
-          <option value="부재">부재</option>
-          <option value="기타">기타</option>
-        </select>
-      </div>
-      <div>
-        <label>인원</label>
-        <select id="event-person">
-          <option value="인원1">인원1</option>
-          <option value="인원2">인원2</option>
-          <option value="인원3">인원3</option>
-        </select>
-      </div>
+      <div><label>일정 종류</label><select id="event-type"></select></div>
+      <div><label>인원</label><select id="event-person"></select></div>
       <div><label>세부 내용</label><textarea id="event-details" rows="3" placeholder="내용을 입력하세요"></textarea></div>
       <div class="btn-group">
         <button onclick="closeModal()">취소</button>
-        <button onclick="saveSchedule()" style="background:#007bff; color:white; border:none;">저장 및 동기화</button>
+        <button onclick="saveData('schedule')" style="background:#007bff; color:white; border:none;">저장 및 동기화</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 환경 설정 팝업창 -->
+  <div id="settings-modal" class="modal">
+    <div class="modal-content" style="width: 340px;">
+      <h3>⚙️ 환경 설정</h3>
+      
+      <div>
+        <label>🔑 관리자 토큰 <span style="font-weight:normal; font-size:0.9em; color:#007bff;">(입력 시 내 기기에 자동 저장)</span></label>
+        <input type="password" id="github-token" placeholder="github_pat_... 붙여넣기" oninput="localStorage.setItem('calendar_github_token', this.value)">
+      </div>
+
+      <hr style="border:0; border-top:1px solid #ddd; margin:15px 0;">
+      
+      <p style="font-size:0.9em; font-weight:bold; color:#333; margin:0 0 5px 0;">달력 옵션 항목 <span style="font-size:0.85em; color:#666; font-weight:normal;">(쉼표로 구분)</span></p>
+      <div><label>일정 종류 목록</label><input type="text" id="config-types"></div>
+      <div><label>인원 목록</label><input type="text" id="config-persons"></div>
+      
+      <div class="btn-group" style="margin-top: 15px;">
+        <button onclick="closeSettingsModal()">닫기</button>
+        <button onclick="saveData('settings')" style="background:#28a745; color:white; border:none;">항목 동기화</button>
       </div>
     </div>
   </div>
@@ -94,7 +117,18 @@
     const API_URL = `https://api.github.com/repos/${REPO}/contents/${FILE_PATH}`;
     
     let currentDate = new Date();
-    let scheduleData = [];
+    let selectedDateStr = "";
+    
+    let appData = {
+      settings: { types: ["업무", "부재", "기타"], persons: ["인원1", "인원2", "인원3"] },
+      events: []
+    };
+
+    const colors = [
+      { bg: "#d4edda", bd: "#28a745" }, { bg: "#f8d7da", bd: "#dc3545" },
+      { bg: "#fff3cd", bd: "#ffc107" }, { bg: "#d1ecf1", bd: "#17a2b8" },
+      { bg: "#e2e3e5", bd: "#6c757d" }, { bg: "#e8dbff", bd: "#6f42c1" }
+    ];
 
     const fixedHolidays = {
       "01-01": "신정", "03-01": "삼일절", "05-05": "어린이날", "06-06": "현충일",
@@ -106,24 +140,34 @@
       "2026-08-17": "대체공휴일", "2026-09-24": "추석 연휴", "2026-09-25": "추석", "2026-09-26": "추석 연휴"
     };
 
-    // 1. 화면 로딩 시 데이터 조회 (403 에러가 나도 화면은 띄우도록 에러 처리 강화)
+    // 로컬 스토리지에 저장된 토큰이 있다면 입력창에 자동 채워넣기
+    const savedToken = localStorage.getItem("calendar_github_token");
+    if (savedToken) {
+      document.getElementById("github-token").value = savedToken;
+    }
+
     async function fetchSchedule() {
       try {
         const res = await fetch(API_URL + "?t=" + new Date().getTime());
         if (res.ok) {
           const data = await res.json();
           const decoded = decodeURIComponent(escape(atob(data.content)));
-          scheduleData = JSON.parse(decoded);
-        } else {
-          console.warn("현재 조회 횟수 제한(시간당 60회)에 걸려 기존 일정을 불러오지 못했습니다. 일정 추가는 정상 작동합니다.");
+          const parsed = JSON.parse(decoded);
+          if (Array.isArray(parsed)) appData.events = parsed;
+          else appData = parsed;
         }
-      } catch (e) {
-        console.error("데이터 로드 실패", e);
-      }
+      } catch (e) { console.error("데이터 로드 실패", e); }
+      updateSelectOptions();
       renderCalendar();
     }
 
-    // 2. 달력 그리기
+    function updateSelectOptions() {
+      const typeSelect = document.getElementById("event-type");
+      const personSelect = document.getElementById("event-person");
+      typeSelect.innerHTML = appData.settings.types.map(t => `<option value="${t}">${t}</option>`).join('');
+      personSelect.innerHTML = appData.settings.persons.map(p => `<option value="${p}">${p}</option>`).join('');
+    }
+
     function renderCalendar() {
       const grid = document.getElementById("calendar-grid");
       grid.innerHTML = "";
@@ -151,10 +195,12 @@
         if (holidayName) cellClass += " holiday";
 
         let eventsHtml = "";
-        scheduleData.forEach(evt => {
+        appData.events.forEach(evt => {
           if (dateStr >= evt.startDate && dateStr <= evt.endDate) {
+            const typeIndex = Math.max(0, appData.settings.types.indexOf(evt.type));
+            const color = colors[typeIndex % colors.length];
             eventsHtml += `
-              <div class="event-item type-${evt.type}">
+              <div class="event-item" style="background:${color.bg}; border-left:3px solid ${color.bd};">
                 <strong>[${evt.type}]</strong> ${evt.person} <br>
                 <span style="color:#666;">${evt.details}</span>
               </div>
@@ -163,7 +209,7 @@
         });
 
         grid.innerHTML += `
-          <div class="${cellClass}" onclick="openModal('${dateStr}')">
+          <div class="${cellClass}" onclick="handleDayClick('${dateStr}')">
             <span class="date-num">${i}</span>
             ${holidayHtml}
             <div class="event-container">${eventsHtml}</div>
@@ -177,91 +223,146 @@
       renderCalendar();
     }
 
-    function openModal(date) {
+    function handleDayClick(dateStr) {
+      selectedDateStr = dateStr;
+      const dayEvents = appData.events.filter(evt => dateStr >= evt.startDate && dateStr <= evt.endDate);
+      
+      if (dayEvents.length > 0) {
+        document.getElementById("action-date-title").innerText = `${dateStr} 일정`;
+        const listDiv = document.getElementById("action-event-list");
+        listDiv.innerHTML = "";
+        
+        dayEvents.forEach(evt => {
+          const typeIndex = Math.max(0, appData.settings.types.indexOf(evt.type));
+          const color = colors[typeIndex % colors.length];
+          listDiv.innerHTML += `
+            <div style="display:flex; justify-content:space-between; align-items:center; background:${color.bg}; border-left:3px solid ${color.bd}; padding:8px; border-radius:4px;">
+              <div style="font-size: 13px;">
+                <strong>[${evt.type}]</strong> ${evt.person} <br>
+                <span style="color:#555;">${evt.details}</span>
+              </div>
+              <button class="btn-delete" onclick="deleteSchedule(${evt.id}, this)">삭제</button>
+            </div>
+          `;
+        });
+        document.getElementById('action-modal').style.display = 'flex';
+      } else {
+        openScheduleModal(dateStr);
+      }
+    }
+
+    function closeActionModal() { document.getElementById('action-modal').style.display = 'none'; }
+
+    function openScheduleModalFromAction() {
+      closeActionModal();
+      openScheduleModal(selectedDateStr);
+    }
+
+    function openScheduleModal(date) {
       document.getElementById('start-date').value = date;
       document.getElementById('end-date').value = date;
       document.getElementById('schedule-modal').style.display = 'flex';
     }
-
+    
     function closeModal() {
       document.getElementById('schedule-modal').style.display = 'none';
       document.getElementById('event-details').value = "";
     }
 
-    // 3. 깃허브에 데이터 저장하기 (토큰을 이용해 409 에러 완벽 차단)
-    async function saveSchedule() {
+    function openSettingsModal() {
+      document.getElementById('config-types').value = appData.settings.types.join(", ");
+      document.getElementById('config-persons').value = appData.settings.persons.join(", ");
+      document.getElementById('settings-modal').style.display = 'flex';
+    }
+    
+    function closeSettingsModal() { document.getElementById('settings-modal').style.display = 'none'; }
+
+    async function deleteSchedule(eventId, btnEl) {
+      if (!confirm("이 일정을 정말 삭제하시겠습니까?")) return;
+      
       const token = document.getElementById("github-token").value;
-      if (!token) {
-        alert("상단 우측에 발급받은 관리자 토큰을 입력하셔야 일정을 저장할 수 있습니다.");
-        return;
-      }
+      if (!token) { alert("우측 상단의 ⚙️ 설정 메뉴에서 관리자 토큰을 먼저 입력해 주세요."); return; }
 
-      const start = document.getElementById("start-date").value;
-      const end = document.getElementById("end-date").value;
-      if(start > end) {
-        alert("종료 날짜가 시작 날짜보다 빠를 수 없습니다.");
-        return;
-      }
-
-      const btn = document.querySelector(".btn-group button:last-child");
-      btn.innerText = "저장 중...";
-      btn.disabled = true;
+      btnEl.innerText = "삭제 중...";
+      btnEl.disabled = true;
 
       try {
-        // [핵심 해결책] 저장하기 직전, 토큰을 사용해 최신 파일의 열쇠(SHA)를 무조건 얻어옵니다.
-        const getRes = await fetch(API_URL + "?t=" + new Date().getTime(), {
-          headers: { "Authorization": `token ${token}` }
-        });
-        
-        if (!getRes.ok) throw new Error("최신 동기화 데이터를 가져오는 데 실패했습니다.");
+        const getRes = await fetch(API_URL + "?t=" + new Date().getTime(), { headers: { "Authorization": `token ${token}` } });
+        if (!getRes.ok) throw new Error("최신 데이터를 가져오지 못했습니다.");
         
         const getData = await getRes.json();
-        const currentSha = getData.sha;
-        const decoded = decodeURIComponent(escape(atob(getData.content)));
-        let currentData = JSON.parse(decoded);
+        let latestData = JSON.parse(decodeURIComponent(escape(atob(getData.content))));
+        if (Array.isArray(latestData)) latestData = { settings: appData.settings, events: latestData };
 
-        // 새 일정 추가
-        const newEvent = {
-          id: Date.now(),
-          startDate: start,
-          endDate: end,
-          type: document.getElementById("event-type").value,
-          person: document.getElementById("event-person").value,
-          details: document.getElementById("event-details").value
-        };
-        currentData.push(newEvent);
-
-        // 깃허브로 전송
-        const jsonStr = JSON.stringify(currentData, null, 2);
-        const encodedContent = btoa(unescape(encodeURIComponent(jsonStr)));
+        latestData.events = latestData.events.filter(evt => evt.id !== eventId);
 
         const putRes = await fetch(API_URL, {
           method: "PUT",
-          headers: {
-            "Authorization": `token ${token}`,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            message: "일정 추가",
-            content: encodedContent,
-            sha: currentSha // 방금 가져온 최신 열쇠(SHA)를 넣음
-          })
+          headers: { "Authorization": `token ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ message: "일정 삭제", content: btoa(unescape(encodeURIComponent(JSON.stringify(latestData, null, 2)))), sha: getData.sha })
         });
 
         if (putRes.ok) {
-          alert("성공적으로 일정이 저장되었습니다!");
-          scheduleData = currentData; // 화면 데이터 즉시 갱신
-          closeModal();
+          appData = latestData;
+          closeActionModal();
           renderCalendar();
-        } else {
-          alert("저장 실패: 토큰 권한을 다시 확인해 주세요.");
-        }
+        } else alert("삭제 실패: 권한을 확인하세요.");
       } catch (e) {
-        console.error(e);
-        alert("저장 중 오류가 발생했습니다. 토큰이 정확한지 확인해 주세요.");
+        console.error(e); alert("오류가 발생했습니다.");
+      }
+    }
+
+    async function saveData(mode) {
+      const token = document.getElementById("github-token").value;
+      if (!token) { alert("우측 상단의 ⚙️ 설정 메뉴에서 관리자 토큰을 먼저 입력해 주세요."); return; }
+
+      let btn = null;
+      try {
+        const getRes = await fetch(API_URL + "?t=" + new Date().getTime(), { headers: { "Authorization": `token ${token}` } });
+        if (!getRes.ok) throw new Error("최신 데이터를 가져오지 못했습니다.");
+        
+        const getData = await getRes.json();
+        let latestData = JSON.parse(decodeURIComponent(escape(atob(getData.content))));
+        if (Array.isArray(latestData)) latestData = { settings: appData.settings, events: latestData };
+
+        if (mode === 'schedule') {
+          const start = document.getElementById("start-date").value;
+          const end = document.getElementById("end-date").value;
+          if(start > end) { alert("종료 날짜 오류"); return; }
+          
+          btn = document.querySelector("#schedule-modal .btn-group button:last-child");
+          btn.innerText = "저장 중...";
+          latestData.events.push({
+            id: Date.now(), startDate: start, endDate: end,
+            type: document.getElementById("event-type").value,
+            person: document.getElementById("event-person").value,
+            details: document.getElementById("event-details").value
+          });
+        } else if (mode === 'settings') {
+          btn = document.querySelector("#settings-modal .btn-group button:last-child");
+          btn.innerText = "저장 중...";
+          const newTypes = document.getElementById('config-types').value.split(',').map(s => s.trim()).filter(s => s);
+          const newPersons = document.getElementById('config-persons').value.split(',').map(s => s.trim()).filter(s => s);
+          latestData.settings = { types: newTypes, persons: newPersons };
+        }
+        btn.disabled = true;
+
+        const putRes = await fetch(API_URL, {
+          method: "PUT",
+          headers: { "Authorization": `token ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ message: mode === 'schedule' ? "일정 추가" : "설정 변경", content: btoa(unescape(encodeURIComponent(JSON.stringify(latestData, null, 2)))), sha: getData.sha })
+        });
+
+        if (putRes.ok) {
+          appData = latestData;
+          if(mode === 'schedule') closeModal();
+          else { updateSelectOptions(); closeSettingsModal(); }
+          renderCalendar();
+        } else alert("권한 오류: 토큰을 다시 확인하세요.");
+      } catch (e) {
+        console.error(e); alert("오류가 발생했습니다.");
       } finally {
-        btn.innerText = "저장 및 동기화";
-        btn.disabled = false;
+        if(btn) { btn.innerText = mode === 'schedule' ? "저장 및 동기화" : "항목 동기화"; btn.disabled = false; }
       }
     }
 
