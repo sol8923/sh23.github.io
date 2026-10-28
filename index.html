@@ -1,11 +1,46 @@
 <!DOCTYPE html>
-<html>
+<html lang="ko">
 <head>
-  <meta charset="utf-8">
-  <title>일정 공유 웹앱 테스트</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>팀 웹앱 포털</title>
+  <style>
+    body { font-family: 'Malgun Gothic', sans-serif; padding: 30px; text-align: center; }
+    h1 { color: #333; margin-bottom: 30px; }
+    .link-container { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+    .link-btn { 
+      text-decoration: none; 
+      padding: 12px 20px; 
+      background-color: #f8f9fa; 
+      color: #333; 
+      border: 1px solid #ddd; 
+      border-radius: 8px; 
+      width: 250px; 
+      font-weight: bold;
+      transition: background-color 0.2s;
+    }
+    .link-btn:hover { background-color: #007bff; color: white; border-color: #007bff; }
+  </style>
 </head>
 <body>
-  <h1>웹 호스팅 테스트 성공!</h1>
-  <p>여기에 앞으로 달력 웹앱이 들어갈 예정입니다.</p>
+
+  <h1>팀 웹앱 메뉴</h1>
+  
+  <div class="link-container">
+    <!-- Link 1: 달력 페이지로 연결 -->
+    <a href="calendar.html" class="link-btn">Link 1 (일정 공유 달력)</a>
+    
+    <!-- Link 2 ~ 10: 아직 연결될 페이지가 없어 임시(#) 처리 -->
+    <a href="#" class="link-btn">Link 2</a>
+    <a href="#" class="link-btn">Link 3</a>
+    <a href="#" class="link-btn">Link 4</a>
+    <a href="#" class="link-btn">Link 5</a>
+    <a href="#" class="link-btn">Link 6</a>
+    <a href="#" class="link-btn">Link 7</a>
+    <a href="#" class="link-btn">Link 8</a>
+    <a href="#" class="link-btn">Link 9</a>
+    <a href="#" class="link-btn">Link 10</a>
+  </div>
+
 </body>
 </html>
