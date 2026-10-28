@@ -84,7 +84,6 @@
         <label>일정 종류</label>
         <select id="event-type" onchange="togglePersonField()"></select>
       </div>
-      <!-- 부재 선택 시에만 나타날 인원 선택란 -->
       <div id="person-container">
         <label>인원</label>
         <select id="event-person"></select>
@@ -123,7 +122,7 @@
     
     let currentDate = new Date();
     let selectedDateStr = "";
-    let editingEventId = null; // 수정 모드 구분을 위한 변수
+    let editingEventId = null;
     
     let appData = {
       settings: { types: ["업무", "부재", "기타"], persons: ["인원1", "인원2", "인원3"] },
@@ -171,12 +170,14 @@
       togglePersonField();
     }
 
-    // [기능 추가 1] 일정 종류에 따라 인원 입력칸 보이기/숨기기
+    // [보완] '부재', '휴가', '연차', '반차' 중 하나라도 포함되면 인원 선택란 표시
     function togglePersonField() {
       const typeSelect = document.getElementById("event-type");
       const personContainer = document.getElementById("person-container");
-      // "부재"일 때만 보이게 처리
-      if (typeSelect.value === "부재") {
+      if(!typeSelect.value) return;
+      
+      const isAbsence = ["부재", "휴가", "연차", "반차"].some(k => typeSelect.value.includes(k));
+      if (isAbsence) {
         personContainer.style.display = "block";
       } else {
         personContainer.style.display = "none";
@@ -215,8 +216,9 @@
             const typeIndex = Math.max(0, appData.settings.types.indexOf(evt.type));
             const color = colors[typeIndex % colors.length];
             
-            // "부재"일 때만 달력에도 인원 표시
-            const personText = evt.type === "부재" ? ` ${evt.person}` : ""; 
+            // 달력 표시 로직도 유연하게 보완
+            const isAbsence = ["부재", "휴가", "연차", "반차"].some(k => evt.type.includes(k));
+            const personText = isAbsence ? ` ${evt.person}` : ""; 
             
             eventsHtml += `
               <div class="event-item" style="background:${color.bg}; border-left:3px solid ${color.bd};">
@@ -254,7 +256,8 @@
         dayEvents.forEach(evt => {
           const typeIndex = Math.max(0, appData.settings.types.indexOf(evt.type));
           const color = colors[typeIndex % colors.length];
-          const personText = evt.type === "부재" ? ` ${evt.person}` : "";
+          const isAbsence = ["부재", "휴가", "연차", "반차"].some(k => evt.type.includes(k));
+          const personText = isAbsence ? ` ${evt.person}` : "";
           
           listDiv.innerHTML += `
             <div style="display:flex; justify-content:space-between; align-items:center; background:${color.bg}; border-left:3px solid ${color.bd}; padding:8px; border-radius:4px;">
@@ -283,28 +286,28 @@
     }
 
     function openScheduleModal(date) {
-      editingEventId = null; // 새 일정 추가 모드
+      editingEventId = null; 
       document.getElementById('schedule-modal-title').innerText = "새 일정 등록";
       document.getElementById('start-date').value = date;
       document.getElementById('end-date').value = date;
       document.getElementById('event-details').value = "";
       if(appData.settings.types.length > 0) document.getElementById('event-type').value = appData.settings.types[0];
-      togglePersonField(); // 종류에 따라 인원칸 자동 숨김/표시
+      togglePersonField();
       document.getElementById('schedule-modal').style.display = 'flex';
     }
     
-    // [기능 추가 2] 수정 버튼 클릭 시 팝업 열기
     function editSchedule(eventId) {
       closeActionModal();
-      const evt = appData.events.find(e => e.id === eventId);
+      // ID 매칭 시 문자열/숫자 타입 충돌 방지를 위해 문자열 변환 후 비교
+      const evt = appData.events.find(e => String(e.id) === String(eventId));
       if (!evt) return;
       
-      editingEventId = eventId; // 수정 모드로 설정
+      editingEventId = eventId;
       document.getElementById('schedule-modal-title').innerText = "일정 수정";
       document.getElementById('start-date').value = evt.startDate;
       document.getElementById('end-date').value = evt.endDate;
       document.getElementById('event-type').value = evt.type;
-      togglePersonField(); // 변경된 종류에 맞게 인원칸 표시 갱신
+      togglePersonField();
       if (evt.person) document.getElementById('event-person').value = evt.person;
       document.getElementById('event-details').value = evt.details;
       
@@ -340,7 +343,7 @@
         let latestData = JSON.parse(decodeURIComponent(escape(atob(getData.content))));
         if (Array.isArray(latestData)) latestData = { settings: appData.settings, events: latestData };
 
-        latestData.events = latestData.events.filter(evt => evt.id !== eventId);
+        latestData.events = latestData.events.filter(evt => String(evt.id) !== String(eventId));
 
         const putRes = await fetch(API_URL, {
           method: "PUT",
@@ -352,6 +355,7 @@
           appData = latestData;
           closeActionModal();
           renderCalendar();
+          alert("일정이 삭제되었습니다.");
         } else alert("삭제 실패: 권한을 확인하세요.");
       } catch (e) {
         console.error(e); alert("오류가 발생했습니다.");
@@ -379,9 +383,9 @@
           btn = document.querySelector("#schedule-modal .btn-group button:last-child");
           btn.innerText = "저장 중...";
           
-          // 수정 모드인지 새 일정 추가 모드인지 분기 처리
           if (editingEventId) {
-            const idx = latestData.events.findIndex(e => e.id === editingEventId);
+            // [보완] ID 매칭 오류 원천 차단
+            const idx = latestData.events.findIndex(e => String(e.id) === String(editingEventId));
             if (idx !== -1) {
               latestData.events[idx].startDate = start;
               latestData.events[idx].endDate = end;
@@ -414,12 +418,20 @@
 
         if (putRes.ok) {
           appData = latestData;
-          if(mode === 'schedule') closeModal();
-          else { updateSelectOptions(); closeSettingsModal(); }
+          if(mode === 'schedule') {
+            alert("일정이 성공적으로 저장/수정되었습니다!");
+            closeModal();
+          } else {
+            alert("설정 항목이 성공적으로 동기화되었습니다!");
+            updateSelectOptions();
+            closeSettingsModal();
+          }
           renderCalendar();
-        } else alert("권한 오류: 토큰을 다시 확인하세요.");
+        } else {
+          alert("권한 오류: 토큰을 다시 확인하세요.");
+        }
       } catch (e) {
-        console.error(e); alert("오류가 발생했습니다.");
+        console.error(e); alert("통신 중 오류가 발생했습니다.");
       } finally {
         if(btn) { btn.innerText = mode === 'schedule' ? "저장 및 동기화" : "항목 동기화"; btn.disabled = false; }
       }
