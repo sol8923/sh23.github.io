@@ -148,16 +148,25 @@
     const savedToken = localStorage.getItem("calendar_github_token");
     if (savedToken) document.getElementById("github-token").value = savedToken;
 
+    // [보완] 조회(fetch) 시에도 토큰을 사용하여 60회 제한을 우회합니다.
     async function fetchSchedule() {
       try {
-        const res = await fetch(API_URL + "?t=" + new Date().getTime());
+        const token = document.getElementById("github-token").value;
+        const headers = {};
+        if (token) headers["Authorization"] = `token ${token}`;
+
+        const res = await fetch(API_URL + "?t=" + new Date().getTime(), { headers });
+        
         if (res.ok) {
           const data = await res.json();
           const parsed = JSON.parse(decodeURIComponent(escape(atob(data.content))));
           if (Array.isArray(parsed)) appData.events = parsed;
           else appData = parsed;
+        } else if (res.status === 403) {
+          alert("데이터 조회 제한에 걸렸습니다. ⚙️ 설정에서 관리자 토큰이 정확히 입력되었는지 확인해 주세요.");
         }
       } catch (e) { console.error("데이터 로드 실패", e); }
+      
       updateSelectOptions();
       renderCalendar();
     }
@@ -170,7 +179,6 @@
       togglePersonField();
     }
 
-    // [보완] '부재', '휴가', '연차', '반차' 중 하나라도 포함되면 인원 선택란 표시
     function togglePersonField() {
       const typeSelect = document.getElementById("event-type");
       const personContainer = document.getElementById("person-container");
@@ -216,7 +224,6 @@
             const typeIndex = Math.max(0, appData.settings.types.indexOf(evt.type));
             const color = colors[typeIndex % colors.length];
             
-            // 달력 표시 로직도 유연하게 보완
             const isAbsence = ["부재", "휴가", "연차", "반차"].some(k => evt.type.includes(k));
             const personText = isAbsence ? ` ${evt.person}` : ""; 
             
@@ -298,7 +305,6 @@
     
     function editSchedule(eventId) {
       closeActionModal();
-      // ID 매칭 시 문자열/숫자 타입 충돌 방지를 위해 문자열 변환 후 비교
       const evt = appData.events.find(e => String(e.id) === String(eventId));
       if (!evt) return;
       
@@ -384,7 +390,6 @@
           btn.innerText = "저장 중...";
           
           if (editingEventId) {
-            // [보완] ID 매칭 오류 원천 차단
             const idx = latestData.events.findIndex(e => String(e.id) === String(editingEventId));
             if (idx !== -1) {
               latestData.events[idx].startDate = start;
