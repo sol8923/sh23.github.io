@@ -4,45 +4,56 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>24시간 임시 공유함</title>
+  <!-- 전체 다운로드(ZIP) 기능을 위한 라이브러리 추가 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  
   <style>
     body { font-family: 'Malgun Gothic', sans-serif; margin: 20px; background-color: #f4f7f6; }
     
-    /* 최상단 헤더 (달력과 동일) */
+    /* 최상단 헤더 */
     .main-header-area { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: white; padding: 15px 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
     .title-wrap h2 { margin: 0; color: #333; display: flex; align-items: center; gap: 10px; }
     .title-wrap p { margin: 5px 0 0 0; font-size: 12px; color: #dc3545; font-weight: bold; }
     
+    .header-btns { display: flex; gap: 10px; }
+    .btn-download-all { background: #17a2b8; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; transition: background 0.2s; }
+    .btn-download-all:hover { background: #138496; }
     .btn-setting { background: #6c757d; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; transition: background 0.2s; }
     .btn-setting:hover { background: #5a6268; }
 
-    /* 업로드 영역 */
-    .upload-section { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; text-align: center; border: 2px dashed #ccc; transition: border-color 0.3s; }
-    .upload-section:hover { border-color: #007bff; }
+    /* 드래그 앤 드롭 업로드 영역 */
+    .upload-section { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; text-align: center; border: 2px dashed #ccc; transition: all 0.3s; position: relative; }
+    .upload-section.dragover { background: #e8f4f8; border-color: #007bff; transform: scale(1.01); }
     .upload-input { display: none; }
     .upload-label { display: inline-block; padding: 10px 20px; background: #e9ecef; color: #333; font-weight: bold; border-radius: 4px; cursor: pointer; transition: background 0.2s; margin-bottom: 10px; }
     .upload-label:hover { background: #dee2e6; }
-    .file-name-display { font-size: 13px; color: #666; margin-bottom: 15px; min-height: 18px; }
+    .file-name-display { font-size: 13px; color: #666; margin-bottom: 15px; min-height: 18px; word-break: break-all; }
     
     .btn-upload { background: #007bff; color: white; border: none; padding: 10px 30px; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 14px; }
     .btn-upload:hover { background: #0056b3; }
     .btn-upload:disabled { background: #999; cursor: not-allowed; }
 
     /* 파일 리스트 영역 */
-    .file-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 15px; }
+    .file-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 15px; }
     .file-card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 10px; border-left: 4px solid #28a745; }
-    .file-icon { font-size: 30px; text-align: center; margin-bottom: 5px; }
+    
+    /* 미리보기 썸네일 스타일 */
+    .preview-container { width: 100%; height: 120px; border-radius: 4px; overflow: hidden; background: #f0f0f0; display: flex; justify-content: center; align-items: center; margin-bottom: 5px; }
+    .preview-img { width: 100%; height: 100%; object-fit: cover; }
+    .file-icon { font-size: 40px; }
+
     .file-info { flex: 1; overflow: hidden; }
-    .file-name { font-weight: bold; font-size: 14px; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 5px; }
+    .file-name { font-weight: bold; font-size: 13px; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 5px; }
     .file-meta { font-size: 11px; color: #777; line-height: 1.4; }
     .time-left { color: #dc3545; font-weight: bold; }
     
-    .card-actions { display: flex; gap: 10px; margin-top: 10px; border-top: 1px solid #eee; padding-top: 10px; }
+    .card-actions { display: flex; gap: 8px; margin-top: 5px; border-top: 1px solid #eee; padding-top: 10px; }
     .btn-download { flex: 1; background: #28a745; color: white; border: none; padding: 6px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; text-decoration: none; text-align: center; }
     .btn-download:hover { background: #218838; }
-    .btn-delete { background: #dc3545; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; }
+    .btn-delete { background: #dc3545; color: white; border: none; padding: 6px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; white-space: nowrap; }
     .btn-delete:hover { background: #c82333; }
 
-    /* 모달 스타일 (달력과 동일) */
+    /* 모달 스타일 */
     .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; }
     .modal-content { background: white; padding: 25px; border-radius: 10px; width: 320px; display: flex; flex-direction: column; gap: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
     .modal-content h3 { margin: 0 0 5px 0; }
@@ -56,22 +67,25 @@
   <div class="main-header-area">
     <div class="title-wrap">
       <h2>📤 24시간 임시 공유함</h2>
-      <p>※ 업로드된 파일은 24시간 후 서버에서 영구 삭제됩니다. (최대 10MB 권장)</p>
+      <p>※ 업로드된 파일은 24시간 후 서버에서 자동 삭제됩니다.</p>
     </div>
-    <button class="btn-setting" onclick="openSettingsModal()">⚙️ 설정 (토큰)</button>
+    <div class="header-btns">
+      <button class="btn-download-all" onclick="downloadAllZip()" id="btn-zip">📦 전체 다운로드(ZIP)</button>
+      <button class="btn-setting" onclick="openSettingsModal()">⚙️ 설정 (토큰)</button>
+    </div>
   </div>
 
-  <div class="upload-section">
-    <input type="file" id="file-input" class="upload-input" onchange="updateFileName()">
-    <label for="file-input" class="upload-label">📁 공유할 사진/파일 선택하기</label>
-    <div id="file-name-display" class="file-name-display">선택된 파일 없음</div>
-    <button id="btn-upload" class="btn-upload" onclick="uploadFile()">🚀 클라우드에 업로드</button>
+  <!-- [추가됨] 드래그 앤 드롭 영역 -->
+  <div class="upload-section" id="drop-zone">
+    <!-- 다중 선택(multiple) 허용 -->
+    <input type="file" id="file-input" class="upload-input" multiple onchange="updateFileName()">
+    <label for="file-input" class="upload-label">📁 클릭하여 선택하거나 여기에 파일 드래그</label>
+    <div id="file-name-display" class="file-name-display">선택된 파일 없음 (여러 개 선택 가능)</div>
+    <button id="btn-upload" class="btn-upload" onclick="uploadFiles()">🚀 클라우드에 일괄 업로드</button>
   </div>
 
-  <!-- 파일이 나열될 그리드 영역 -->
-  <div class="file-grid" id="file-grid">
-    <!-- 자바스크립트로 파일 카드가 추가됩니다 -->
-  </div>
+  <!-- 파일 리스트 그리드 -->
+  <div class="file-grid" id="file-grid"></div>
 
   <!-- 설정 모달 -->
   <div id="settings-modal" class="modal">
@@ -79,10 +93,9 @@
       <h3>⚙️ 환경 설정</h3>
       <div>
         <label>🔑 관리자 토큰 <span style="font-weight:normal; font-size:0.9em; color:#007bff;">(자동 저장)</span></label>
-        <!-- calendar.html과 동일한 키(calendar_github_token)를 사용하여 완벽히 연동됩니다 -->
         <input type="password" id="github-token" placeholder="github_pat_... 붙여넣기" oninput="localStorage.setItem('calendar_github_token', this.value)">
       </div>
-      <p style="font-size:12px; color:#666; line-height:1.4;">달력에서 입력한 토큰과 연동됩니다. 한 곳에만 입력하면 달력과 공유함을 모두 사용할 수 있습니다.</p>
+      <p style="font-size:12px; color:#666; line-height:1.4;">달력에서 입력한 토큰과 연동됩니다.</p>
       <div class="btn-group">
         <button onclick="closeSettingsModal()" style="background:#28a745; color:white; border:none; padding:6px 12px; border-radius:4px; font-weight:bold;">확인 및 닫기</button>
       </div>
@@ -93,18 +106,39 @@
     const REPO = "sol8923/sh23.github.io";
     const DB_PATH = "shared_files.json";
     const API_URL = `https://api.github.com/repos/${REPO}/contents/${DB_PATH}`;
-    const RAW_URL = `https://sol8923.github.io/sh23.github.io/`; // 다운로드 시 연결될 베이스 주소
+    
+    // 업로드 즉시 확인이 가능하도록 GitHub Raw 주소 사용 (Pages 빌드 지연 방지)
+    const RAW_URL = `https://raw.githubusercontent.com/${REPO}/main/`; 
     
     let appData = { files: [] };
     let dbSha = null;
+    let selectedFiles = []; // 다중 파일 저장을 위한 배열
 
-    // 달력 앱과 동일한 로컬 스토리지 키에서 토큰 불러오기
     const savedToken = localStorage.getItem("calendar_github_token");
-    if (savedToken) {
-      document.getElementById("github-token").value = savedToken;
-    }
+    if (savedToken) document.getElementById("github-token").value = savedToken;
 
-    // 1. 데이터베이스(파일 목록) 불러오기 및 만료 검사
+    // ----- 드래그 앤 드롭 이벤트 설정 -----
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('dragover');
+    });
+    dropZone.addEventListener('dragleave', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+    });
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+      if (e.dataTransfer.files.length > 0) {
+        fileInput.files = e.dataTransfer.files; // input에 파일 덮어쓰기
+        updateFileName();
+      }
+    });
+
+    // ----- DB 불러오기 및 정리 -----
     async function fetchDB() {
       const token = document.getElementById("github-token").value;
       const headers = token ? { "Authorization": `token ${token}` } : {};
@@ -117,22 +151,15 @@
           appData = JSON.parse(decodeURIComponent(escape(atob(data.content))));
           if (!appData.files) appData.files = [];
         } else if (res.status === 404) {
-          // 파일이 처음 생성되는 경우
           appData = { files: [] };
           dbSha = null;
-        } else if (res.status === 403) {
-          console.warn("데이터 조회 제한에 걸렸으나 화면은 띄웁니다.");
         }
-      } catch (e) {
-        console.error("DB 로드 실패", e);
-      }
+      } catch (e) { console.error("DB 로드 실패", e); }
 
-      // 데이터를 불러온 직후, 24시간이 지난 파일 청소꾼(Lazy Clean) 실행
       await cleanExpiredFiles();
       renderFiles();
     }
 
-    // [핵심] 24시간 지난 파일 감지 및 깃허브에서 완전 삭제
     async function cleanExpiredFiles() {
       const now = Date.now();
       const ONE_DAY = 24 * 60 * 60 * 1000;
@@ -140,10 +167,9 @@
       const expired = appData.files.filter(f => now - f.timestamp > ONE_DAY);
       const active = appData.files.filter(f => now - f.timestamp <= ONE_DAY);
       
-      // 만료된 파일이 1개라도 있다면 삭제 프로세스 시작
       if (expired.length > 0) {
         const token = document.getElementById("github-token").value;
-        if (!token) return; // 토큰이 없으면 지울 권한도 없으므로 스킵
+        if (!token) return; 
         
         for (let f of expired) {
           try {
@@ -152,10 +178,9 @@
               headers: { "Authorization": `token ${token}`, "Content-Type": "application/json" },
               body: JSON.stringify({ message: "24시간 만료된 파일 자동 삭제", sha: f.sha })
             });
-          } catch(e) { console.error("개별 파일 삭제 실패", e); }
+          } catch(e) {}
         }
         
-        // 파일들을 지웠으니 DB 파일(목록)에서도 지우고 저장
         appData.files = active;
         try {
           const putRes = await fetch(API_URL, {
@@ -171,74 +196,96 @@
             const resData = await putRes.json();
             dbSha = resData.content.sha;
           }
-        } catch(e) { console.error("DB 정리 실패", e); }
+        } catch(e) {}
       }
     }
 
+    // ----- 파일 업로드 기능 (다중 파일 처리) -----
     function updateFileName() {
-      const fileInput = document.getElementById("file-input");
+      selectedFiles = Array.from(fileInput.files);
       const display = document.getElementById("file-name-display");
-      if (fileInput.files.length > 0) {
-        display.innerText = `선택됨: ${fileInput.files[0].name} (${(fileInput.files[0].size / 1024 / 1024).toFixed(2)} MB)`;
+      if (selectedFiles.length === 1) {
+        display.innerText = `선택됨: ${selectedFiles[0].name} (${(selectedFiles[0].size / 1024 / 1024).toFixed(2)} MB)`;
+      } else if (selectedFiles.length > 1) {
+        display.innerText = `선택됨: 총 ${selectedFiles.length}개 파일 선택됨`;
       } else {
-        display.innerText = "선택된 파일 없음";
+        display.innerText = "선택된 파일 없음 (여러 개 선택 가능)";
       }
     }
 
-    // 2. 파일 깃허브 업로드 로직
-    async function uploadFile() {
-      const fileInput = document.getElementById("file-input");
-      if (!fileInput.files.length) return alert("파일을 먼저 선택해주세요.");
+    // 파일을 Base64로 변환하는 프로미스 래퍼
+    function readFileAsBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result.split(',')[1]);
+        reader.onerror = (e) => reject(e);
+        reader.readAsDataURL(file);
+      });
+    }
+
+    async function uploadFiles() {
+      if (selectedFiles.length === 0) return alert("파일을 먼저 선택해주세요.");
       
-      const file = fileInput.files[0];
-      // 깃허브 통신 쾌적함을 위해 10MB로 제한 권장 (초과 시 너무 오래 걸림)
-      if (file.size > 10 * 1024 * 1024) {
-        return alert("원활한 업로드를 위해 10MB 이하의 파일만 지원합니다.");
+      // 용량 제한 검사 (개별 파일 10MB)
+      for (let f of selectedFiles) {
+        if (f.size > 10 * 1024 * 1024) {
+          return alert(`[${f.name}] 파일이 10MB를 초과합니다. 큰 파일은 제외해 주세요.`);
+        }
       }
       
       const token = document.getElementById("github-token").value;
       if (!token) return alert("우측 상단 설정 메뉴에서 관리자 토큰을 입력해 주세요.");
       
       const btn = document.getElementById("btn-upload");
-      btn.innerText = "업로드 중... (10~20초 소요될 수 있습니다)";
+      btn.innerText = `업로드 중... (총 ${selectedFiles.length}개)`;
       btn.disabled = true;
 
-      const reader = new FileReader();
-      reader.onload = async function(e) {
-        // Base64 텍스트만 추출 (데이터 URL 헤더 제거)
-        const base64Data = e.target.result.split(',')[1];
-        const timestamp = Date.now();
-        // 한글/공백 파일명 오류 방지를 위해 안전한 영문/숫자 조합으로 치환하여 저장
-        const safeName = timestamp + "_" + file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
-        const filePath = `uploads/${safeName}`;
+      let newEntries = [];
+      let successCount = 0;
+
+      // [1] 선택된 파일을 순차적으로 깃허브에 업로드
+      for (let i = 0; i < selectedFiles.length; i++) {
+        const file = selectedFiles[i];
+        btn.innerText = `업로드 중... (${i+1}/${selectedFiles.length} 완료)`;
         
         try {
-          // [1] 실제 파일 깃허브에 밀어넣기
+          const base64Data = await readFileAsBase64(file);
+          const timestamp = Date.now() + i; // ID 중복 방지
+          const safeName = timestamp + "_" + file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+          const filePath = `uploads/${safeName}`;
+          
           const fileRes = await fetch(`https://api.github.com/repos/${REPO}/contents/${filePath}`, {
             method: "PUT",
             headers: { "Authorization": `token ${token}`, "Content-Type": "application/json" },
-            body: JSON.stringify({ message: "새 파일 업로드", content: base64Data })
+            body: JSON.stringify({ message: `다중 파일 업로드: ${file.name}`, content: base64Data })
           });
           
-          if (!fileRes.ok) throw new Error("파일 업로드 권한 오류");
+          if (!fileRes.ok) throw new Error("업로드 권한 오류");
           const fileData = await fileRes.json();
-          const fileSha = fileData.content.sha; // 추후 삭제를 위해 부여받은 파일 고유값(SHA) 저장
           
-          // [2] 업로드 도중 다른 사람이 파일을 올렸을 수 있으므로 DB 최신화
-          await fetchDBWithoutClean(token);
-          
-          // [3] DB 리스트에 추가
-          appData.files.push({
+          newEntries.push({
             id: timestamp,
             originalName: file.name,
             path: filePath,
-            sha: fileSha,
+            sha: fileData.content.sha,
             timestamp: timestamp
           });
-          
-          // [4] 최신화된 DB 깃허브에 저장
+          successCount++;
+        } catch (err) {
+          console.error(err);
+          alert(`[${file.name}] 업로드 실패`);
+        }
+      }
+
+      // [2] 업로드가 1개라도 성공했다면 DB 파일 일괄 업데이트
+      if (newEntries.length > 0) {
+        btn.innerText = "데이터베이스 기록 중...";
+        await fetchDBWithoutClean(token);
+        appData.files.push(...newEntries);
+        
+        try {
           const payload = {
-            message: "파일 목록 업데이트",
+            message: "파일 목록 일괄 업데이트",
             content: btoa(unescape(encodeURIComponent(JSON.stringify(appData, null, 2))))
           };
           if (dbSha) payload.sha = dbSha;
@@ -252,27 +299,20 @@
           if (putRes.ok) {
             const putData = await putRes.json();
             dbSha = putData.content.sha;
-            alert("공유함에 성공적으로 등록되었습니다!");
+            alert(`${successCount}개의 파일이 성공적으로 등록되었습니다!`);
             fileInput.value = "";
             updateFileName();
             renderFiles();
           } else {
             throw new Error("DB 업데이트 오류");
           }
-        } catch (err) {
-          console.error(err);
-          alert("업로드 실패: 토큰이나 파일 크기를 확인하세요.");
-        } finally {
-          btn.innerText = "🚀 클라우드에 업로드";
-          btn.disabled = false;
-        }
-      };
-      
-      // 파일을 Base64 문자열로 읽기 시작
-      reader.readAsDataURL(file);
+        } catch(e) { alert("목록 기록 실패: 토큰을 확인하세요."); }
+      }
+
+      btn.innerText = "🚀 클라우드에 일괄 업로드";
+      btn.disabled = false;
     }
 
-    // 업로드 직전 최신 DB만 가볍게 긁어오는 함수
     async function fetchDBWithoutClean(token) {
       try {
         const res = await fetch(API_URL + "?t=" + new Date().getTime(), { headers: { "Authorization": `token ${token}` } });
@@ -285,39 +325,44 @@
       } catch (e) {}
     }
 
-    // 3. 화면에 파일 목록 그려주기
+    // ----- 화면 그리기 (미리보기 포함) -----
     function renderFiles() {
       const grid = document.getElementById("file-grid");
       grid.innerHTML = "";
       
       if (!appData.files || appData.files.length === 0) {
-        grid.innerHTML = "<div style='color:#999; margin-top:20px; font-weight:bold;'>현재 공유 중인 파일이 없습니다.</div>";
+        grid.innerHTML = "<div style='color:#999; margin-top:20px; font-weight:bold; grid-column: 1 / -1;'>현재 공유 중인 파일이 없습니다.</div>";
         return;
       }
       
       const now = Date.now();
       const ONE_DAY = 24 * 60 * 60 * 1000;
       
-      // 최신 파일이 위로 오게 정렬
       const sortedFiles = [...appData.files].sort((a, b) => b.timestamp - a.timestamp);
 
       sortedFiles.forEach(f => {
         const upDate = new Date(f.timestamp);
         const upStr = `${upDate.getMonth()+1}/${upDate.getDate()} ${String(upDate.getHours()).padStart(2,'0')}:${String(upDate.getMinutes()).padStart(2,'0')}`;
         
-        // 남은 시간 계산
         const diff = (f.timestamp + ONE_DAY) - now;
         const hoursLeft = Math.floor(diff / (1000 * 60 * 60));
         const minsLeft = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
         const timeLeftStr = hoursLeft > 0 ? `${hoursLeft}시간 ${minsLeft}분 남음` : `${minsLeft}분 남음 (곧 삭제됨)`;
         
-        // 확장자에 따른 아이콘 (사진/문서 구분)
+        // 이미지 확장자 검사 -> 이미지면 미리보기(img), 아니면 아이콘(📄)
         const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(f.originalName);
-        const icon = isImage ? "🖼️" : "📄";
+        let previewHtml = "";
+        
+        if (isImage) {
+          previewHtml = `<div class="preview-container"><img src="${RAW_URL}${f.path}" class="preview-img" alt="미리보기"></div>`;
+        } else {
+          previewHtml = `<div class="preview-container"><div class="file-icon">📄</div></div>`;
+        }
 
+        // 개별 다운로드 시 강제 다운로드를 유도하기 위해 blob으로 변환하여 저장
         grid.innerHTML += `
           <div class="file-card">
-            <div class="file-icon">${icon}</div>
+            ${previewHtml}
             <div class="file-info">
               <div class="file-name" title="${f.originalName}">${f.originalName}</div>
               <div class="file-meta">
@@ -326,29 +371,84 @@
               </div>
             </div>
             <div class="card-actions">
-              <a href="${RAW_URL}${f.path}" target="_blank" class="btn-download">⬇️ 다운로드</a>
-              <button class="btn-delete" onclick="manualDelete(${f.id}, '${f.path}', '${f.sha}')">수동 삭제</button>
+              <button class="btn-download" onclick="downloadSingleFile('${RAW_URL}${f.path}', '${f.originalName}')">⬇️ 받기</button>
+              <button class="btn-delete" onclick="manualDelete(${f.id}, '${f.path}', '${f.sha}')">삭제</button>
             </div>
           </div>
         `;
       });
     }
 
-    // 파일 강제 수동 삭제 기능
+    // ----- 다운로드 기능 -----
+    // 단일 파일 팝업 없이 깔끔하게 받기 (Blob 처리)
+    async function downloadSingleFile(url, filename) {
+      try {
+        const res = await fetch(url);
+        const blob = await res.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = blobUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(blobUrl);
+      } catch (e) {
+        // 실패 시 새 창으로 강제 오픈
+        window.open(url, '_blank');
+      }
+    }
+
+    // [핵심] 전체 파일 ZIP으로 압축해서 받기
+    async function downloadAllZip() {
+      if (appData.files.length === 0) return alert("다운로드할 파일이 없습니다.");
+      
+      const btn = document.getElementById("btn-zip");
+      btn.innerText = "압축 중... 잠시만 기다려주세요";
+      btn.disabled = true;
+
+      try {
+        const zip = new JSZip();
+        
+        // 모든 파일을 순회하며 fetch (Blob 생성)
+        for (let f of appData.files) {
+          const res = await fetch(RAW_URL + f.path);
+          const blob = await res.blob();
+          zip.file(f.originalName, blob); // ZIP 객체에 원본 이름으로 파일 쑤셔넣기
+        }
+        
+        // ZIP 파일 생성 후 브라우저에서 다운로드
+        const content = await zip.generateAsync({ type: "blob" });
+        const blobUrl = window.URL.createObjectURL(content);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = `공유파일_전체_${new Date().getTime()}.zip`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(blobUrl);
+        
+      } catch(e) {
+        console.error(e);
+        alert("압축 중 오류가 발생했습니다.");
+      } finally {
+        btn.innerText = "📦 전체 다운로드(ZIP)";
+        btn.disabled = false;
+      }
+    }
+
+    // ----- 수동 삭제 기능 -----
     async function manualDelete(id, path, sha) {
       if (!confirm("이 파일을 즉시 삭제하시겠습니까?")) return;
       const token = document.getElementById("github-token").value;
       if (!token) return alert("권한이 없습니다. 관리자 토큰을 확인하세요.");
 
       try {
-        // [1] 파일 지우기
         await fetch(`https://api.github.com/repos/${REPO}/contents/${path}`, {
           method: 'DELETE',
           headers: { "Authorization": `token ${token}`, "Content-Type": "application/json" },
           body: JSON.stringify({ message: "사용자 수동 삭제", sha: sha })
         });
         
-        // [2] DB 업데이트
         await fetchDBWithoutClean(token);
         appData.files = appData.files.filter(f => f.id !== id);
         
@@ -367,16 +467,13 @@
           dbSha = resData.content.sha;
           renderFiles();
         }
-      } catch (e) {
-        console.error(e); alert("삭제 중 오류가 발생했습니다.");
-      }
+      } catch (e) { console.error(e); alert("삭제 중 오류가 발생했습니다."); }
     }
 
     // 설정 모달 제어
     function openSettingsModal() { document.getElementById('settings-modal').style.display = 'flex'; }
     function closeSettingsModal() { document.getElementById('settings-modal').style.display = 'none'; fetchDB(); }
 
-    // 페이지 접속 시 최초 1회 실행
     fetchDB();
   </script>
 </body>
