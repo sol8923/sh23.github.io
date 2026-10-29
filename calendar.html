@@ -7,17 +7,18 @@
   <style>
     body { font-family: 'Malgun Gothic', sans-serif; margin: 20px; }
     
-    /* 상단 설정 버튼 영역 */
-    .top-bar { display: flex; justify-content: flex-end; align-items: center; margin-bottom: 10px; }
-    .btn-setting { background: #6c757d; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+    /* 레이아웃 구조 세팅 */
+    .main-header-area { display: flex; gap: 20px; align-items: center; margin-bottom: 15px; }
+    .calendar-header-col { flex: 1; position: relative; display: flex; justify-content: center; align-items: center; }
+    .side-spacer { width: 230px; flex-shrink: 0; }
+    
+    .main-content-area { display: flex; gap: 20px; align-items: flex-start; }
+    .calendar-content-col { flex: 1; min-width: 0; }
+
+    /* 헤더 및 버튼 스타일 */
+    .btn-setting { background: #6c757d; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; position: absolute; right: 0; top: 50%; transform: translateY(-50%); }
     .btn-setting:hover { background: #5a6268; }
     
-    /* 전체 레이아웃 (달력 영역과 우측 사이드 패널 분리) */
-    .main-container { display: flex; gap: 20px; align-items: flex-start; }
-    .calendar-section { flex: 1; min-width: 0; }
-    
-    /* [수정됨] 달력 헤더 (버튼들을 중앙으로 모음) */
-    .header { display: flex; justify-content: center; align-items: center; margin-bottom: 20px; }
     .month-title-wrap { display: flex; align-items: center; gap: 15px; }
     .month-title-wrap h2 { margin: 0; min-width: 130px; text-align: center; }
     .btn-arrow { padding: 5px 12px; cursor: pointer; border: 1px solid #ccc; border-radius: 4px; background: white; font-weight: bold; }
@@ -42,14 +43,14 @@
     .event-container { margin-top: 5px; flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
     .event-item { padding: 3px 4px; border-radius: 3px; font-size: 11px; color: #333; line-height: 1.2; word-break: break-all; }
 
-    /* [추가됨] 우측 부재 일정 패널 스타일 */
+    /* 우측 부재 일정 패널 스타일 */
     .side-section { width: 230px; background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #e9ecef; flex-shrink: 0; box-sizing: border-box; }
     .side-header { margin-top: 0; font-size: 15px; color: #333; border-bottom: 2px solid #dc3545; padding-bottom: 8px; margin-bottom: 12px; font-weight: bold; }
     .side-list { list-style: none; padding: 0; margin: 0; font-size: 13px; }
     .side-list li { margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px dashed #ddd; }
     .side-list li:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
     .side-date { color: #666; font-size: 11px; margin-bottom: 3px; }
-    .side-person { font-weight: bold; color: #dc3545; font-size: 14px; }
+    .side-person { font-weight: bold; color: #000; font-size: 14px; } /* 색상 검은색으로 변경 */
 
     /* 팝업(모달) 공통 스타일 */
     .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; }
@@ -67,22 +68,28 @@
 </head>
 <body>
 
-  <div class="top-bar">
-    <button class="btn-setting" onclick="openSettingsModal()">⚙️ 설정 (토큰/항목)</button>
+  <!-- 최상단 헤더 영역 -->
+  <div class="main-header-area">
+    <!-- 달력 바로 위쪽 영역 -->
+    <div class="calendar-header-col">
+      <div class="month-title-wrap">
+        <button class="btn-arrow" onclick="changeMonth(-1)">◀</button>
+        <h2 id="month-title"></h2>
+        <button class="btn-arrow" onclick="changeMonth(1)">▶</button>
+        <button class="btn-today" onclick="goToToday()">오늘</button>
+      </div>
+      <!-- 설정 버튼이 달력 우측 끝 선에 맞춰집니다 -->
+      <button class="btn-setting" onclick="openSettingsModal()">⚙️ 설정 (토큰/항목)</button>
+    </div>
+    <!-- 우측 패널 위쪽의 빈 공간 유지 (가운데 정렬을 위함) -->
+    <div class="side-spacer"></div>
   </div>
 
-  <div class="main-container">
+  <!-- 달력과 우측 패널이 가로로 배치되는 메인 컨텐츠 영역 -->
+  <div class="main-content-area">
+    
     <!-- 좌측 달력 영역 -->
-    <div class="calendar-section">
-      <div class="header">
-        <div class="month-title-wrap">
-          <button class="btn-arrow" onclick="changeMonth(-1)">◀</button>
-          <h2 id="month-title"></h2>
-          <button class="btn-arrow" onclick="changeMonth(1)">▶</button>
-          <button class="btn-today" onclick="goToToday()">오늘</button>
-        </div>
-      </div>
-
+    <div class="calendar-content-col">
       <div class="grid" id="calendar-days">
         <div class="day-name sun">일</div><div class="day-name">월</div><div class="day-name">화</div>
         <div class="day-name">수</div><div class="day-name">목</div><div class="day-name">금</div><div class="day-name sat">토</div>
@@ -90,11 +97,12 @@
       <div class="grid" id="calendar-grid"></div>
     </div>
 
-    <!-- 우측 부재 일정 패널 -->
+    <!-- 우측 부재 일정 패널 (달력 요일 상단 선과 일치하여 시작됨) -->
     <div class="side-section">
       <h3 class="side-header">🏖️ 예정된 부재</h3>
       <div id="side-event-list"></div>
     </div>
+    
   </div>
 
   <!-- 날짜 클릭 시 나타나는 미니 팝업 -->
@@ -183,7 +191,6 @@
     const savedToken = localStorage.getItem("calendar_github_token");
     if (savedToken) document.getElementById("github-token").value = savedToken;
 
-    // 한국 시간 기준 YYYY-MM-DD 구하는 유틸 함수
     function getLocalYYYYMMDD(dateObj) {
       const year = dateObj.getFullYear();
       const month = String(dateObj.getMonth() + 1).padStart(2, '0');
@@ -284,16 +291,13 @@
         `;
       }
       
-      // 달력이 그려질 때 우측 패널도 함께 갱신
       renderSidePanel();
     }
 
-    // [추가됨] 우측 부재 일정 패널 그리기
     function renderSidePanel() {
       const listContainer = document.getElementById("side-event-list");
       listContainer.innerHTML = "";
 
-      // 기준일 계산: 7일 전 ~ 60일 후
       const now = new Date();
       const startLimitDate = new Date(now);
       startLimitDate.setDate(now.getDate() - 7);
@@ -303,15 +307,12 @@
       const startLimitStr = getLocalYYYYMMDD(startLimitDate);
       const endLimitStr = getLocalYYYYMMDD(endLimitDate);
 
-      // 대상 일정 필터링
       let targetEvents = appData.events.filter(evt => {
         const isAbsence = ["부재", "휴가", "연차", "반차"].some(k => evt.type.includes(k));
         if (!isAbsence) return false;
-        // 지정된 날짜 범위와 겹치는지 확인
         return evt.endDate >= startLimitStr && evt.startDate <= endLimitStr;
       });
 
-      // 시작일 기준으로 오름차순 정렬
       targetEvents.sort((a, b) => a.startDate.localeCompare(b.startDate));
 
       if(targetEvents.length === 0) {
@@ -321,7 +322,7 @@
 
       let html = "<ul class='side-list'>";
       targetEvents.forEach(evt => {
-        const sDate = evt.startDate.substring(5).replace("-", "."); // 2026-10-15 -> 10.15
+        const sDate = evt.startDate.substring(5).replace("-", "."); 
         const eDate = evt.endDate.substring(5).replace("-", ".");
         const dateText = (evt.startDate === evt.endDate) ? sDate : `${sDate} ~ ${eDate}`;
         
@@ -451,7 +452,7 @@
         if (putRes.ok) {
           appData = latestData;
           closeActionModal();
-          renderCalendar(); // 달력 갱신 시 우측 패널도 자동 갱신됨
+          renderCalendar();
           alert("일정이 삭제되었습니다.");
         } else alert("삭제 실패: 권한을 확인하세요.");
       } catch (e) {
@@ -522,7 +523,7 @@
             updateSelectOptions();
             closeSettingsModal();
           }
-          renderCalendar(); // 달력 갱신 시 우측 패널도 자동 갱신됨
+          renderCalendar();
         } else {
           alert("권한 오류: 토큰을 다시 확인하세요.");
         }
