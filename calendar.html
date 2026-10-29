@@ -10,7 +10,7 @@
     /* 레이아웃 구조 세팅 */
     .main-header-area { display: flex; gap: 20px; align-items: center; margin-bottom: 15px; }
     .calendar-header-col { flex: 1; position: relative; display: flex; justify-content: center; align-items: center; }
-    .side-spacer { width: 230px; flex-shrink: 0; }
+    .side-spacer { width: 160px; flex-shrink: 0; } /* 우측 패널 폭 축소에 맞춰 조정 */
     
     .main-content-area { display: flex; gap: 20px; align-items: flex-start; }
     .calendar-content-col { flex: 1; min-width: 0; }
@@ -32,7 +32,7 @@
     .day-name.sun { color: red; }
     .day-name.sat { color: blue; }
     
-    .date-cell { border: 1px solid #ddd; border-radius: 4px; height: 110px; padding: 5px; cursor: pointer; text-align: left; display: flex; flex-direction: column; overflow: hidden; }
+    .date-cell { border: 1px solid #ddd; border-radius: 4px; height: 110px; padding: 5px; cursor: pointer; text-align: left; display: flex; flex-direction: column; overflow: hidden; transition: all 0.3s; }
     .date-cell:hover { background: #f8f9fa; border-color: #007bff; }
     .date-cell .date-num { font-weight: bold; }
     .date-cell.sun .date-num { color: red; }
@@ -43,14 +43,22 @@
     .event-container { margin-top: 5px; flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
     .event-item { padding: 3px 4px; border-radius: 3px; font-size: 11px; color: #333; line-height: 1.2; word-break: break-all; }
 
-    /* 우측 부재 일정 패널 스타일 */
-    .side-section { width: 230px; background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #e9ecef; flex-shrink: 0; box-sizing: border-box; }
-    .side-header { margin-top: 0; font-size: 15px; color: #333; border-bottom: 2px solid #dc3545; padding-bottom: 8px; margin-bottom: 12px; font-weight: bold; }
-    .side-list { list-style: none; padding: 0; margin: 0; font-size: 13px; }
-    .side-list li { margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px dashed #ddd; }
-    .side-list li:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
-    .side-date { color: #666; font-size: 11px; margin-bottom: 3px; }
-    .side-person { font-weight: bold; color: #000; font-size: 14px; } /* 색상 검은색으로 변경 */
+    /* 클릭 후 이동 시 반짝임 애니메이션 */
+    @keyframes highlight-cell {
+      0% { background-color: #fff3cd; transform: scale(1.02); border-color: #ffc107; box-shadow: 0 0 10px rgba(255, 193, 7, 0.5); }
+      100% { background-color: transparent; transform: scale(1); border-color: #ddd; box-shadow: none; }
+    }
+    .highlight-anim { animation: highlight-cell 1.5s ease-out; }
+
+    /* 우측 부재 일정 패널 (폭 축소) */
+    .side-section { width: 160px; background: #f8f9fa; padding: 15px 10px; border-radius: 8px; border: 1px solid #e9ecef; flex-shrink: 0; box-sizing: border-box; }
+    .side-header { margin-top: 0; font-size: 14px; color: #333; border-bottom: 2px solid #dc3545; padding-bottom: 8px; margin-bottom: 12px; font-weight: bold; text-align: center; }
+    .side-list { list-style: none; padding: 0; margin: 0; font-size: 12px; }
+    .side-list li { margin-bottom: 5px; padding: 8px; border-bottom: 1px dashed #ddd; cursor: pointer; transition: background 0.2s; border-radius: 4px; }
+    .side-list li:hover { background: #e9ecef; }
+    .side-list li:last-child { border-bottom: none; margin-bottom: 0; }
+    .side-date { color: #666; font-size: 10px; margin-bottom: 3px; }
+    .side-person { font-weight: bold; color: #000; font-size: 13px; }
 
     /* 팝업(모달) 공통 스타일 */
     .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; }
@@ -70,7 +78,6 @@
 
   <!-- 최상단 헤더 영역 -->
   <div class="main-header-area">
-    <!-- 달력 바로 위쪽 영역 -->
     <div class="calendar-header-col">
       <div class="month-title-wrap">
         <button class="btn-arrow" onclick="changeMonth(-1)">◀</button>
@@ -78,14 +85,12 @@
         <button class="btn-arrow" onclick="changeMonth(1)">▶</button>
         <button class="btn-today" onclick="goToToday()">오늘</button>
       </div>
-      <!-- 설정 버튼이 달력 우측 끝 선에 맞춰집니다 -->
       <button class="btn-setting" onclick="openSettingsModal()">⚙️ 설정 (토큰/항목)</button>
     </div>
-    <!-- 우측 패널 위쪽의 빈 공간 유지 (가운데 정렬을 위함) -->
     <div class="side-spacer"></div>
   </div>
 
-  <!-- 달력과 우측 패널이 가로로 배치되는 메인 컨텐츠 영역 -->
+  <!-- 메인 컨텐츠 영역 -->
   <div class="main-content-area">
     
     <!-- 좌측 달력 영역 -->
@@ -97,9 +102,9 @@
       <div class="grid" id="calendar-grid"></div>
     </div>
 
-    <!-- 우측 부재 일정 패널 (달력 요일 상단 선과 일치하여 시작됨) -->
+    <!-- 우측 부재 일정 패널 -->
     <div class="side-section">
-      <h3 class="side-header">🏖️ 예정된 부재</h3>
+      <h3 class="side-header">🏖️ 부재 일정</h3>
       <div id="side-event-list"></div>
     </div>
     
@@ -282,8 +287,9 @@
           }
         });
 
+        // 각 날짜 칸에 고유 ID(cell-날짜) 부여 (이동 시 포커싱용)
         grid.innerHTML += `
-          <div class="${cellClass}" onclick="handleDayClick('${dateStr}')">
+          <div id="cell-${dateStr}" class="${cellClass}" onclick="handleDayClick('${dateStr}')">
             <span class="date-num">${i}</span>
             ${holidayHtml}
             <div class="event-container">${eventsHtml}</div>
@@ -316,7 +322,7 @@
       targetEvents.sort((a, b) => a.startDate.localeCompare(b.startDate));
 
       if(targetEvents.length === 0) {
-        listContainer.innerHTML = "<div style='color:#999; font-size:12px; text-align:center; margin-top:20px;'>해당 기간에 부재 일정이<br>없습니다.</div>";
+        listContainer.innerHTML = "<div style='color:#999; font-size:12px; text-align:center; margin-top:20px;'>부재 일정이 없습니다.</div>";
         return;
       }
 
@@ -326,8 +332,9 @@
         const eDate = evt.endDate.substring(5).replace("-", ".");
         const dateText = (evt.startDate === evt.endDate) ? sDate : `${sDate} ~ ${eDate}`;
         
+        // 항목 클릭 시 focusOnDate 함수 실행
         html += `
-          <li>
+          <li onclick="focusOnDate('${evt.startDate}')" title="클릭하면 달력이 이동합니다">
             <div class="side-date">${dateText}</div>
             <div class="side-person">${evt.person}</div>
           </li>
@@ -335,6 +342,32 @@
       });
       html += "</ul>";
       listContainer.innerHTML = html;
+    }
+
+    // [기능 추가] 특정 날짜로 달력을 넘기고 해당 칸 클릭 효과 주기
+    function focusOnDate(dateStr) {
+      const parts = dateStr.split('-');
+      const year = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1; // 월은 0부터 시작
+      
+      // 달력을 해당 일정의 월로 변경
+      currentDate = new Date(year, month, 1);
+      renderCalendar();
+
+      // 화면이 갱신된 직후 해당 날짜 칸 찾아서 효과 주기
+      setTimeout(() => {
+        const cell = document.getElementById(`cell-${dateStr}`);
+        if (cell) {
+          cell.scrollIntoView({ behavior: 'smooth', block: 'center' }); // 스크롤 이동
+          cell.classList.add('highlight-anim'); // 반짝임 애니메이션
+          
+          // 애니메이션 후 팝업(클릭 이벤트) 실행
+          setTimeout(() => {
+            handleDayClick(dateStr);
+            cell.classList.remove('highlight-anim');
+          }, 300);
+        }
+      }, 50);
     }
 
     function changeMonth(step) {
